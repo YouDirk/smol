@@ -1,7 +1,9 @@
 
 import sys
 
-from smolshared import *
+from .util import error, hash_djb2
+from .elf  import ELFMachine
+
 
 def output_x86(libraries, nx, h16, outf):
     outf.write('; vim: set ft=nasm:\n') # be friendly
@@ -27,7 +29,7 @@ def output_x86(libraries, nx, h16, outf):
 
     shorts = { l: l.split('.', 1)[0].lower().replace('-', '_') for l in libraries }
 
-    outf.write('%include "header32.asm"\n')
+    outf.write('%include "header-x86.asm"\n')
     outf.write('dynamic.needed:\n')
     for library in libraries:
         outf.write('dd 1;DT_NEEDED\n')
@@ -53,8 +55,7 @@ dynamic.end:
         for sym, reloc in symrels:
             # meh
             if reloc != 'R_386_PC32' and reloc != 'R_386_GOT32X':
-                eprintf('Relocation type ' + reloc + ' of symbol ' + sym + ' unsupported!')
-                sys.exit(1)
+                error('Relocation type ' + reloc + ' of symbol ' + sym + ' unsupported!')
 
             hash = hash_bsd2(sym) if h16 else hash_djb2(sym)
             if nx:
@@ -83,8 +84,7 @@ global {name}
 
         outf.write('_smolplt.end:\n')
 
-    outf.write('%include "loader32.asm"\n')
-# end output_x86
+    outf.write('%include "loader-x86.asm"\n')
 
 
 def output_amd64(libraries, nx, h16, outf):
@@ -100,7 +100,7 @@ def output_amd64(libraries, nx, h16, outf):
 
     shorts = { l: l.split('.', 1)[0].lower().replace('-', '_') for l in libraries }
 
-    outf.write('%include "header64.asm"\n')
+    outf.write('%include "header-x86_64.asm"\n')
     outf.write('dynamic.needed:\n')
     for library in libraries:
         outf.write('    dq 1;DT_NEEDED\n')
@@ -155,14 +155,12 @@ global {name}
 """.format(lib=shorts[library],name=sym).lstrip('\n'))
 
     outf.write('_smolplt.end:\n')
-    outf.write('%include "loader64.asm"\n')
-# end output_amd64
+    outf.write('%include "loader-x86_64.asm"\n')
 
 
-def output(arch, libraries, nx, h16, outf):
-    if arch == 'i386': output_x86(libraries, nx, h16, outf)
-    elif arch == 'x86_64': output_amd64(libraries, nx, h16, outf)
+def output_table(arch, libraries, nx, h16, outf):
+    if   arch == ELFMachine.i386  : return output_x86(libraries, nx, h16, outf)
+    elif arch == ELFMachine.x86_64: return output_amd64(libraries, nx, h16, outf)
     else:
-        eprintf("E: cannot emit for arch '" + str(arch) + "'")
-        sys.exit(1)
+        error("E: cannot emit for arch '" + str(arch) + "'")
 

@@ -41,12 +41,13 @@ CXXFLAGS += -m$(BITS) $(shell pkg-config --cflags sdl2)
 
 LIBS=-lc
 
-SMOLFLAGS +=
-ASFLAGS   += -DUSE_INTERP -DNO_START_ARG -DUNSAFE_DYNAMIC -DUSE_DNLOAD_LOADER #-DALIGN_STACK
-#-DUSE_DNLOAD_LOADER #-DUSE_DT_DEBUG #-DUSE_DL_FINI #-DNO_START_ARG #-DUNSAFE_DYNAMIC
+SMOLFLAGS += -D no_start_arg -D unsafe_dynamic -D use_dnload_loader #-D align_stack
+# use_dnload_loader, use_dt_debug, use_dl_fini, no_start_arg, unsafe_dynamic
 
 NASM    ?= nasm
 PYTHON3 ?= python3
+
+SMOLFLAGS += --nasm=$(NASM)
 
 all: $(BINDIR)/hello-crt $(BINDIR)/sdl-crt $(BINDIR)/flag $(BINDIR)/hello-_start
 
@@ -55,41 +56,33 @@ LIBS += $(filter-out -pthread,$(shell pkg-config --libs sdl2)) -lX11 #-lGL
 clean:
 	@$(RM) -vrf $(OBJDIR) $(BINDIR)
 
-%/:
+$(OBJDIR)/ $(BINDIR)/:
 	@mkdir -vp "$@"
 
 .SECONDARY:
 
-$(OBJDIR)/%.lto.o: $(SRCDIR)/%.c $(OBJDIR)/
+$(OBJDIR)/%.lto.o: $(SRCDIR)/%.c | $(OBJDIR)/
 	$(CC) -flto $(CFLAGS) -c "$<" -o "$@"
-$(OBJDIR)/%.lto.o: $(TESTDIR)/%.c $(OBJDIR)/
+$(OBJDIR)/%.lto.o: $(TESTDIR)/%.c | $(OBJDIR)/
 	$(CC) -flto $(CFLAGS) -c "$<" -o "$@"
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c $(OBJDIR)/
+$(OBJDIR)/%.start.o: $(OBJDIR)/%.lto.o $(OBJDIR)/crt1.lto.o
+	$(CC) $(LDFLAGS) -r -o "$@" $^
+
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)/
 	$(CC) $(CFLAGS) -c "$<" -o "$@"
-$(OBJDIR)/%.o: $(TESTDIR)/%.c $(OBJDIR)/
+$(OBJDIR)/%.o: $(TESTDIR)/%.c | $(OBJDIR)/
 	$(CC) $(CFLAGS) -c "$<" -o "$@"
 
 $(OBJDIR)/%.start.o: $(OBJDIR)/%.lto.o $(OBJDIR)/crt1.lto.o
 	$(CC) $(LDFLAGS) -r -o "$@" $^
 
-$(OBJDIR)/symbols.%.asm: $(OBJDIR)/%.o
-	$(PYTHON3) $(PYDIR)/smol.py $(SMOLFLAGS) $(LIBS) "$<" "$@"
+$(BINDIR)/%: $(OBJDIR)/%.o | $(BINDIR)/
+	./smold $(SMOLFLAGS) $(LIBS) $^ -o $@
+	./smoltrunc "$@" "$(OBJDIR)/$(notdir $@)" && mv "$(OBJDIR)/$(notdir $@)" "$@" && chmod +x "$@"
 
-$(OBJDIR)/stub.%.o: $(OBJDIR)/symbols.%.asm $(SRCDIR)/header32.asm \
-        $(SRCDIR)/loader32.asm
-	$(NASM) $(ASFLAGS) $< -o $@
-
-$(OBJDIR)/stub.%.start.o: $(OBJDIR)/symbols.%.start.asm $(SRCDIR)/header32.asm \
-        $(SRCDIR)/loader32.asm
-	$(NASM) $(ASFLAGS) $< -o $@
-
-$(BINDIR)/%: $(OBJDIR)/%.o $(OBJDIR)/stub.%.o $(BINDIR)/
-	$(CC) -Wl,-Map=$(BINDIR)/$*.map $(LDFLAGS_) $(OBJDIR)/$*.o $(OBJDIR)/stub.$*.o -o "$@"
-	./rmtrailzero.py "$@" "$(OBJDIR)/$(notdir $@)" && mv "$(OBJDIR)/$(notdir $@)" "$@" && chmod +x "$@"
-
-$(BINDIR)/%-crt: $(OBJDIR)/%.start.o $(OBJDIR)/stub.%.start.o $(BINDIR)/
-	$(CC) -Wl,-Map=$(BINDIR)/$*-crt.map $(LDFLAGS_) $(OBJDIR)/$*.start.o $(OBJDIR)/stub.$*.start.o -o "$@"
+$(BINDIR)/%-crt: $(OBJDIR)/%.start.o  | $(BINDIR)/
+	./smold $(SMOLFLAGS) $(LIBS) $^ -o $@
 
 .PHONY: all clean
 
