@@ -7,10 +7,10 @@ import shutil
 import tempfile
 import subprocess
 
-from smol.util import error
-from smol.elf import ELFMachine, ELF_DEFAULT_BITS
+from smol.util  import error
+from smol.elf   import ELFMachine, ELF_DEFAULT_BITS
 from smol.parse import decide_arch, find_lib, find_symbol, get_cc_paths, get_needed_syms
-from smol.emit import output_table
+from smol.emit  import output_table
 
 
 def main():
@@ -48,7 +48,8 @@ def main():
 
     for util in ['nasm', 'cc', 'scanelf', 'readelf', 'ld']:
         if not getattr(args, util):
-            parser.error('utility "{u}" could not be found! either install it or pass the path with --{u}'
+            parser.error('utility "{u}" could not be found! either install" + \
+                         " it or pass the path with --{u}'
                 .format(u=util))
 
     opts = set()
@@ -92,12 +93,18 @@ def main():
         symbols[library].append((symbol, reloc))
 
     as_args = ['-D' + opt.upper() for opt in opts]
-    with tempfile.NamedTemporaryFile('w', suffix='.s') as table, tempfile.NamedTemporaryFile('w', suffix='.o') as tableobj:
+    with tempfile.NamedTemporaryFile('w', suffix='.s') as table, \
+            tempfile.NamedTemporaryFile('w', suffix='.o') as tableobj:
         output_table(arch, symbols, table)
         table.flush()
         try:
-            subprocess.check_call([args.nasm] + as_args + ['-I', args.runtime_dir + '/', '-f', 'elf{}'.format(bits), table.name, '-o', tableobj.name])
-            subprocess.check_call([args.ld, '-T', os.path.join(args.linker_dir, 'link.ld'), '--oformat=binary', '-o', args.output, tableobj.name] + ld_args + args.input)
+            subprocess.check_call([args.nasm] + as_args + \
+                ['-I', args.runtime_dir + '/', '-f', 'elf{}'.format(bits), \
+                    table.name, '-o', tableobj.name])
+            subprocess.check_call([args.ld, '-T', \
+                os.path.join(args.linker_dir, 'link.ld'), '--oformat=binary', \
+                                   '-o', args.output, tableobj.name] \
+                                  + ld_args + args.input)
         except subprocess.CalledProcessError:
             sys.exit(1)
 

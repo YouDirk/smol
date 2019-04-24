@@ -44,7 +44,7 @@ Possible `smol-opt`s:
 
 ```
 usage: smold [-h] [-m TARGET] [-l LIB] [-L DIR] [--smol-opt OPT]
-             [--loader-dir LOADER_DIR] [--nasm NASM] [--ld LD] [--cc CC]
+             [--smol-loader-dir DIR] [--nasm NASM] [--ld LD] [--cc CC]
              [--scanelf SCANELF] [--readelf READELF] [-o OUT]
              input [input ...]
 
