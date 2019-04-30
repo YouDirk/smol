@@ -2,6 +2,8 @@
 import sys
 import struct
 
+def eprintf(*args, **kwargs, ):
+    print(*args, file=sys.stderr, **kwargs)
 
 def log(msg, file=sys.stdout):
     file.write(msg)
@@ -40,3 +42,4 @@ def readstr(blob, off):
         text.append(char)
 
     return text.decode('utf-8'), off
+

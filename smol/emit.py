@@ -1,14 +1,17 @@
 
 import sys
 
-from .util import error, hash_djb2
+from .util import error, hash_djb2, eprintf
 from .elf  import ELFMachine
 
 
 def output_x86(libraries, nx, h16, outf):
     outf.write('; vim: set ft=nasm:\n') # be friendly
 
-    if nx:  outf.write('%define USE_NX 1\n')
+    #if nx:  outf.write('%define USE_NX 1\n')
+    if nx:
+        eprintf("NX not supported yet on i386.\n")
+        nx = False
     if h16: outf.write('%define USE_HASH16 1\n')
 
     usedrelocs = set({})
@@ -16,9 +19,8 @@ def output_x86(libraries, nx, h16, outf):
         for sym, reloc in symrels: usedrelocs.add(reloc)
 
     if not(nx) and 'R_386_PC32' in usedrelocs and 'R_386_GOT32X' in usedrelocs:
-        eprintf("Using a mix of R_386_PC32 and R_386_GOT32X relocations! "+\
-                "Please change a few C compiler flags and recompile your code.")
-        exit(1)
+        error("Using a mix of R_386_PC32 and R_386_GOT32X relocations! "+\
+              "Please change a few C compiler flags and recompile your code.")
 
 
     use_jmp_bytes = not nx and 'R_386_PC32' in usedrelocs
@@ -59,7 +61,7 @@ dynamic.end:
 
             hash = hash_bsd2(sym) if h16 else hash_djb2(sym)
             if nx:
-                outf.write("\t\t_symbols.{lib}.{name}: dd 0x{hash:x}"\
+                outf.write("\t\t_symbols.{lib}.{name}: dd 0x{hash:x}\n"\
                     .format(lib=shorts[library],name=sym,hash=hash).lstrip('\n'))
             else:
                 outf.write(("""\

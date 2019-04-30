@@ -41,13 +41,13 @@ CXXFLAGS += -m$(BITS) $(shell pkg-config --cflags sdl2)
 
 LIBS=-lc
 
-SMOLFLAGS += -D no_start_arg -D unsafe_dynamic -D use_dnload_loader #-D align_stack
+SMOLFLAGS += -Duse_dnload_loader -Dalign_stack #-Dno_start_arg -Dunsafe_dynamic
 # use_dnload_loader, use_dt_debug, use_dl_fini, no_start_arg, unsafe_dynamic
 
 NASM    ?= nasm
 PYTHON3 ?= python3
 
-SMOLFLAGS += --nasm=$(NASM)
+SMOLFLAGS += --nasm=$(NASM) $(LDFLAGS)
 
 all: $(BINDIR)/hello-crt $(BINDIR)/sdl-crt $(BINDIR)/flag $(BINDIR)/hello-_start
 

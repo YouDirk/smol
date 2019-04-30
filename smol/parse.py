@@ -101,3 +101,4 @@ def find_symbol(scanelf_bin, libraries, libnames, symbol):
             return soname
 
     return None
+

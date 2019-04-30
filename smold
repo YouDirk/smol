@@ -22,7 +22,15 @@ def main():
     parser.add_argument('-L', '--libdir', metavar='DIR', action='append',
         help='directories to search libraries in')
 
-    parser.add_argument('--smol-opt', metavar='OPT', default=['use_interp'], action='append',
+
+    parser.add_argument('-s', '--hash16', default=False, action='store_true', \
+        help="Use 16-bit (BSD) hashes instead of 32-bit djb2 hashes. "\
+            +"Must be used with -Duse_dnload_loader")
+    parser.add_argument('-n', '--nx', default=False, action='store_true', \
+        help="Use NX (i.e. don't use RWE pages). Costs the size of one phdr, "\
+            +"plus some extra bytes on i386.")
+
+    parser.add_argument('-D', '--smol-opt', metavar='OPT', default=['use_interp'], action='append',
         help='optimization flags for smol')
     parser.add_argument('--linker-dir', default=path.join(path.dirname(__file__), 'ld'),
         help='path to link-time files')
@@ -44,7 +52,7 @@ def main():
 
     args, ld_args = parser.parse_known_args()
 
-    print(args.smol_opt)
+    print(args)
 
     for util in ['nasm', 'cc', 'scanelf', 'readelf', 'ld']:
         if not getattr(args, util):
@@ -62,15 +70,25 @@ def main():
     args.library = args.library or []
     args.libdir = args.libdir or []
     if args.target:
-        arch = args.target.tolower().replace('elf_', '')
-        if arch not in ELFMachine:
-            parser.error('unknown architecture: {}'.format(arch))
-        arch = ELFMachine(arch)
+        arch = args.target.lower().replace('elf_', '')
+
+        # compat with how gcc does things on x86es
+        if arch == '32': arch = ELFMachine.i386
+        elif arch == '64': arch = ELFMachine.x86_64
+        else:
+            if arch not in ELFMachine:
+                parser.error('unknown architecture: {}'.format(arch))
+            arch = ELFMachine(arch)
+
         bits = ELF_DEFAULT_BITS[arch]
     else:
         arch, bits = decide_arch(args.input)
         if not arch or not bits:
             error('Invalid architecture!')
+
+    if arch == ELFMachine.i386: ld_args.append("-melf_i386")
+    elif arch == ELFMachine.i386: ld_args.append("-melf_x86_64")
+    else: pass # shouldn't happen
 
     syms = get_needed_syms(args.readelf, args.input)
     paths = get_cc_paths(args.cc)
@@ -93,9 +111,10 @@ def main():
         symbols[library].append((symbol, reloc))
 
     as_args = ['-D' + opt.upper() for opt in opts]
-    with tempfile.NamedTemporaryFile('w', suffix='.s') as table, \
+    with tempfile.NamedTemporaryFile('w', suffix='.asm') as table, \
             tempfile.NamedTemporaryFile('w', suffix='.o') as tableobj:
-        output_table(arch, symbols, table)
+        table = open("/tmp/test.asm", 'w')
+        output_table(arch, symbols, args.nx, args.hash16, table)
         table.flush()
         try:
             subprocess.check_call([args.nasm] + as_args + \
