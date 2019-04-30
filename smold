@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-import os
-from os import path
-import sys
-import argparse
-import shutil
-import tempfile
-import subprocess
 
-from smol.util  import error
+import argparse
+import os
+from   os import path
+import shutil
+import sys
+import tempfile
+
+from smol.util  import error, doexec
 from smol.elf   import ELFMachine, ELF_DEFAULT_BITS
-from smol.parse import decide_arch, find_lib, find_symbol, get_cc_paths, get_needed_syms
+from smol.parse import decide_arch, find_lib, find_symbol, get_cc_paths, \
+                       get_needed_syms, ld_is_cc
 from smol.emit  import output_table
 
 
@@ -23,10 +24,10 @@ def main():
         help='directories to search libraries in')
 
 
-    parser.add_argument('-s', '--hash16', default=False, action='store_true', \
+    parser.add_argument('--hash16', default=False, action='store_true', \
         help="Use 16-bit (BSD) hashes instead of 32-bit djb2 hashes. "\
             +"Must be used with -Duse_dnload_loader")
-    parser.add_argument('-n', '--nx', default=False, action='store_true', \
+    parser.add_argument('--nx', default=False, action='store_true', \
         help="Use NX (i.e. don't use RWE pages). Costs the size of one phdr, "\
             +"plus some extra bytes on i386.")
 
@@ -52,7 +53,7 @@ def main():
 
     args, ld_args = parser.parse_known_args()
 
-    print(args)
+    #print(args)
 
     for util in ['nasm', 'cc', 'scanelf', 'readelf', 'ld']:
         if not getattr(args, util):
@@ -86,8 +87,12 @@ def main():
         if not arch or not bits:
             error('Invalid architecture!')
 
-    if arch == ELFMachine.i386: ld_args.append("-melf_i386")
-    elif arch == ELFMachine.i386: ld_args.append("-melf_x86_64")
+    ldiscc = ld_is_cc(args.ld)
+
+    if arch == ELFMachine.i386:
+        ld_args.append("-m32" if ldiscc else "-melf_i386")
+    elif arch == ELFMachine.i386:
+        ld_args.append("-m32" if ldiscc else "-melf_x86_64")
     else: pass # shouldn't happen
 
     syms = get_needed_syms(args.readelf, args.input)
@@ -113,15 +118,15 @@ def main():
     as_args = ['-D' + opt.upper() for opt in opts]
     with tempfile.NamedTemporaryFile('w', suffix='.asm') as table, \
             tempfile.NamedTemporaryFile('w', suffix='.o') as tableobj:
-        table = open("/tmp/test.asm", 'w')
         output_table(arch, symbols, args.nx, args.hash16, table)
         table.flush()
         try:
-            subprocess.check_call([args.nasm] + as_args + \
+            doexec([args.nasm] + as_args + \
                 ['-I', args.runtime_dir + '/', '-f', 'elf{}'.format(bits), \
                     table.name, '-o', tableobj.name])
-            subprocess.check_call([args.ld, '-T', \
-                os.path.join(args.linker_dir, 'link.ld'), '--oformat=binary', \
+            oformat = ('-Wl,' if ldiscc else '') + '--oformat=binary'
+            doexec([args.ld, '-T', \
+                os.path.join(args.linker_dir, 'link.ld'), oformat, \
                                    '-o', args.output, tableobj.name] \
                                   + ld_args + args.input)
         except subprocess.CalledProcessError:

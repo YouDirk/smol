@@ -1,6 +1,7 @@
 
-import sys
 import struct
+import subprocess
+import sys
 
 def eprintf(*args, **kwargs, ):
     print(*args, file=sys.stderr, **kwargs)
@@ -42,4 +43,15 @@ def readstr(blob, off):
         text.append(char)
 
     return text.decode('utf-8'), off
+
+
+def doexec(args, verbose=False):
+    if verbose: log(str(args))
+    subprocess.check_call(args)
+
+
+def doexecoutp(args):
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    proc.wait()
+    return None if proc.returncode != 0 else proc.stdout.read()
 

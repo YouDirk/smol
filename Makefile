@@ -47,7 +47,7 @@ SMOLFLAGS += -Duse_dnload_loader -Dalign_stack #-Dno_start_arg -Dunsafe_dynamic
 NASM    ?= nasm
 PYTHON3 ?= python3
 
-SMOLFLAGS += --nasm=$(NASM) $(LDFLAGS)
+SMOLFLAGS += --nasm=$(NASM)
 
 all: $(BINDIR)/hello-crt $(BINDIR)/sdl-crt $(BINDIR)/flag $(BINDIR)/hello-_start
 

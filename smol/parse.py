@@ -5,8 +5,8 @@ import subprocess
 import struct
 import sys
 
-from .elf import ELFMachine
-from .util import warn, error
+from .elf  import ELFMachine
+from .util import warn, error, doexecoutp
 
 
 def decide_arch(files):
@@ -34,7 +34,7 @@ def decide_arch(files):
 def build_reloc_typ_table(reo):
     relocs = {}
 
-    for s in reo.decode('utf-8').splitlines():
+    for s in reo.decode('utf-8').splitlines()[3:]:
         cols = s.split()
 
         # prolly a 'header' line
@@ -56,7 +56,7 @@ def get_needed_syms(readelf_bin, inpfiles):
     relocs = build_reloc_typ_table(outrel)
 
     syms = set()
-    for entry in output.decode('utf-8').splitlines():
+    for entry in output.decode('utf-8').splitlines()[3:]:
         cols = entry.split()
         if len(cols) < 8:
             continue
@@ -101,4 +101,10 @@ def find_symbol(scanelf_bin, libraries, libnames, symbol):
             return soname
 
     return None
+
+def ld_is_cc(ldpath):
+    outf = doexecoutp([ldpath, "--version"])
+    if outf is None: return False # good enough
+    outf = outf.decode('utf-8')
+    return "GCC" in outf or "clang" in outf # also good enough
 
