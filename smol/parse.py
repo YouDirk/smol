@@ -152,8 +152,10 @@ def get_needed_syms(readelf_bin, inpfile) -> Dict[str, str]: # (symname, relocty
 def format_cc_path_line(entry):
     category, path = entry.split(': ', 1)
     path = path.lstrip('=')
-    return (category, list(set(os.path.realpath(p) \
-        for p in path.split(':') if os.path.isdir(p))))
+    paths = list(os.path.realpath(p) \
+                 for p in path.split(':') if os.path.isdir(p))
+    paths.reverse() # order of $LD_LIBRARY_PATH
+    return (category, list(paths))
 
 
 def get_cc_paths(cc_bin):
